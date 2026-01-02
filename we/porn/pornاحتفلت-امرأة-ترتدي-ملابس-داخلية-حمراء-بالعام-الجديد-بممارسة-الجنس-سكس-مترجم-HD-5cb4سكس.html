@@ -1,0 +1,119 @@
+<head><script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3L7L7QN2RW"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3L7L7QN2RW');</script></head>import os
+import random
+import json
+from bs4 import BeautifulSoup
+
+FOLDER_PATH = r'C:\Users\Administrator\Downloads\9\www2.justsalad.com\tuaa\video'
+BASE_URL = 'https://www2.justsalad.com/we/videos/'
+GA_ID = 'G-3L7L7QN2RW'
+
+html_files = [f for f in os.listdir(FOLDER_PATH) if f.endswith('.html')]
+urls = [BASE_URL + f for f in html_files]
+
+print(f'🔍 Found {len(html_files)} HTML files\n')
+
+for idx, file_name in enumerate(html_files, 1):
+    file_path = os.path.join(FOLDER_PATH, file_name)
+    page_url = BASE_URL + file_name
+
+    print(f'[{idx}/{len(html_files)}] Processing: {file_name}')
+
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        soup = BeautifulSoup(f, 'html.parser')
+
+    # ========== 1. Google Analytics ==========
+    if not soup.find(string=lambda x: x and GA_ID in x):
+        ga_script = soup.new_tag('script', async=True, src=f'https://www.googletagmanager.com/gtag/js?id={GA_ID}')
+        inline = soup.new_tag('script')
+        inline.string = f"""
+window.dataLayer = window.dataLayer || [];
+function gtag(){{dataLayer.push(arguments);}}
+gtag('js', new Date());
+gtag('config', '{GA_ID}');
+"""
+        soup.head.append(ga_script)
+        soup.head.append(inline)
+        print('   ✅ GA added')
+
+    # ========== 2. Fix overflow hidden ==========
+    for tag in soup.find_all(style=True):
+        if 'overflow:hidden' in tag['style']:
+            tag['style'] = tag['style'].replace('overflow:hidden', '')
+            print('   🧹 Removed overflow:hidden')
+
+    # ========== 3. Improve VideoObject ==========
+    scripts = soup.find_all('script', type='application/ld+json')
+    for s in scripts:
+        try:
+            data = json.loads(s.string)
+            if data.get('@type') == 'VideoObject':
+                data.update({
+                    "publisher": {
+                        "@type": "Organization",
+                        "name": "Android MPV",
+                        "logo": {
+                            "@type": "ImageObject",
+                            "url": "https://www2.justsalad.com/logo.png"
+                        }
+                    },
+                    "inLanguage": "ar",
+                    "isFamilyFriendly": False,
+                    "potentialAction": {
+                        "@type": "WatchAction",
+                        "target": page_url
+                    }
+                })
+                s.string = json.dumps(data, ensure_ascii=False, indent=2)
+                print('   🎥 VideoObject boosted')
+        except:
+            pass
+
+    # ========== 4. Silent H2 ==========
+    if not soup.find('h2'):
+        h2 = soup.new_tag('h2', style='display:none')
+        h2.string = 'سكس عربي سكس مصري افلام سكس  HD 2026 – مشاهدة أقوى المقاطع الحصرية'
+        soup.body.insert(0, h2)
+        print('   🧠 Silent H2 added')
+
+    # ========== 5. Meta Description ==========
+    if soup.find('meta', attrs={'name': 'description'}):
+        desc = soup.find('meta', attrs={'name': 'description'})
+        if '2026' not in desc.get('content', ''):
+            desc['content'] += ' |  سكس عربي سكس مصري سكس مترجم سكس عراقي سكس افلام سكس HD 2026'
+            print('   📝 Meta description enhanced')
+
+    # ========== 6. Internal Links ==========
+    for old in soup.select('.internal-links'):
+        old.decompose()
+
+    other_urls = [u for u in urls if u != page_url]
+    links = random.sample(other_urls, min(random.randint(5, 8), len(other_urls)))
+
+    div = soup.new_tag('div', **{
+        'class': 'internal-links',
+        'style': 'margin:30px 0;padding:15px;background:#111;border-radius:12px;border:1px solid #222;'
+    })
+
+    h3 = soup.new_tag('h3')
+    h3.string = '🎬 فيديوهات سكس مصري سكس عراقي سكس مترجم جديد افلام سكس مترجمة عربي مشابهة'
+    div.append(h3)
+
+    ul = soup.new_tag('ul')
+    for link in links:
+        li = soup.new_tag('li')
+        a = soup.new_tag('a', href=link)
+        a.string = link.split('/')[-1].replace('-', ' ').replace('.html', '')
+        li.append(a)
+        ul.append(li)
+
+    div.append(ul)
+    soup.body.append(div)
+    print('   🔗 Internal links updated')
+
+    # ========== Save ==========
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(str(soup))
+
+    print('   💾 Saved\n')
+
+print('🚀 DONE: All pages optimized successfully')
